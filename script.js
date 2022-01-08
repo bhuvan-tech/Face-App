@@ -1,46 +1,38 @@
-let video=document.getElementById('video');
-let model;
-let canvas = document.getElementById('canvas');
-let ctx = canvas.getContext("2d");
+const video = document.getElementById('video');
 
-const setupCamera =() => {
-    navigator.mediaDevices.getUserMedia({
-        video : {width: 600,height : 400},
-        audio: false,
-    }).then(stream => {
-        video.srcObject = stream;
-    });
-};
+//which runs all asyncronously
+Promise.all([
+    faceapi.nets.tinyFaceDetector.loadFromUri('./models'),
+    faceapi.nets.faceLandmark68Net.loadFromUri('./models'),
+    faceapi.nets.faceRecognitionNet.loadFromUri('./models'),
+    faceapi.nets.faceExpressionNet.loadFromUri('./models')
 
-const detectFaces = async() => {
-    const prediction = await model.estimateFaces(video,false);
-    console.log(prediction);
+]).then(startVideo)
+//access wecam from user
+function startVideo(){
+    navigator.getUserMedia(
+        {video:{}},
+        stream => video.srcObject = stream,
+        err => console.error(err) //for some error
+    )
+}
 
-    ctx.drawImage(video,0,0,600,400);
+video.addEventListener('play',()=>{
 
-    prediction.forEach(pred => {
-        ctx.beginPath();
-        ctx.lineWidth='4';
-        ctx.strokeStyle ='blue';
-        ctx.rect(
-            pred.topLeft[0],
-            pred.topLeft[1],
-            pred.bottomRight[0] - pred.topLeft[0],
-            pred.bottomRight[1] - pred.topLeft[1]
-        );
-        ctx.stroke();
+    //creating a canvas element using js
+    const canvas = faceapi.createCanvasFromMedia(video)
+    document.body.append(canvas)
+    const displaySize ={width: video.width, height: video.height}
+    faceapi.matchDimensions(canvas, displaySize)
 
-        ctx.fillStyle='red';
-        pred.landmarks.forEach(landmark => {
-            ctx.fillRect(landmark[0], landmark[1], 5, 5);
-        })
-    });
-};
+    setInterval(async () =>{
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceExpressions()
 
-setupCamera();
-video.addEventListener("loadeddata",async() => {
-    model = await blazeface.load();
-    setInterval(detectFaces,40);
-    
-});
-
+        const resizedDetections = faceapi.resizeResults(detections, displaySize)
+        canvas.getContext('2d').clearRect(0,0,canvas.width, canvas.height) // to delete canvas
+        faceapi.draw.drawDetections(canvas, resizedDetections)
+        faceapi.draw.drawFaceExpressions(canvas, resizedDetections)
+    },100)
+})
