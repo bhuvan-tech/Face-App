@@ -1,2 +1,2 @@
 # Face-App
-Simple Face Recognition wesite using tensorflow.js 
+Simple Emotion Detection wesite using tensorflow.js - https://bhuvan-tech.github.io/Face-App/
